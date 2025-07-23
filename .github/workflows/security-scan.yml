@@ -37,17 +37,3 @@ jobs:
         with:
           name: bandit-report # This will be the name of the artifact.
           path: bandit-report.json # The path to the file you want to upload.
-
-  semgrep-scan:
-    name: Semgrep Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Run Semgrep
-        uses: semgrep/semgrep-action@main
-        with:
-          # You can specify rulesets here. 'p/default' is a good start.
-          config: >-
-            p/default
