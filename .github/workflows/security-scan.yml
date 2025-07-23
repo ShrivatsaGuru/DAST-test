@@ -1,0 +1,43 @@
+# .github/workflows/security-scan.yml
+
+name: Security Scan
+
+# This workflow runs on every push to any branch
+on: [push]
+
+jobs:
+  bandit-scan:
+    name: Bandit Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit
+        # Scans all files in the repository recursively.
+        # It will fail the job if it finds any issues.
+        run: bandit -r .
+
+  semgrep-scan:
+    name: Semgrep Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        # Use the official Semgrep Action
+        # It automatically downloads community rules and scans your code.
+        uses: semgrep/semgrep-action@v2
+        with:
+          # You can specify rulesets here. 'p/default' is a good start.
+          config: >-
+            p/default
