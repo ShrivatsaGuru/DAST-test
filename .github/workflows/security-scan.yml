@@ -34,9 +34,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Semgrep
-        # Use the official Semgrep Action
-        # It automatically downloads community rules and scans your code.
-        uses: semgrep/semgrep-action@v2
+        uses: semgrep/semgrep-action@main
         with:
           # You can specify rulesets here. 'p/default' is a good start.
           config: >-
