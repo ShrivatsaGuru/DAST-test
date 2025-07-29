@@ -12,36 +12,32 @@ jobs:
     name: Bandit Scan
     runs-on: ubuntu-latest
     steps:
+      # This step USES an action
       - name: Check out code
         uses: actions/checkout@v4
 
+      # This step USES an action
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Bandit
+      # This step RUNS a command
+      - name: Install Bandit and jq
         run: |
           pip install bandit
           sudo apt-get update && sudo apt-get install -y jq
-              
 
+      # This step RUNS a command
       - name: Run Bandit and Generate Report
-
         run: bandit -r . -f json -o bandit-report.json --exit-zero
 
+      # This step RUNS a command
       - name: Summarize Report with Gemini
         run: |
-          Report=$(jq -c .bandit-report.json)
-          Payload=$(printf('{"contents":[{"parts":[{"text": "You are a cybersecurity expert. Summarize this Bandit security report, identify the main risks, and list them by severity (High, Medium, Low). Report:\n\n%s"}]}]}' "$Report")
+          REPORT_CONTENT=$(jq -c . bandit-report.json)
+          PAYLOAD=$(printf '{"contents":[{"parts":[{"text": "You are a cybersecurity expert. Summarize this Bandit security report, identify the main risks, and list them by severity (High, Medium, Low). Report:\n\n%s"}]}]}' "$REPORT_CONTENT")
           curl -X POST \
                -H "Content-Type: application/json" \
                "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
                -d "$PAYLOAD" | jq .
-               
-        
-    
-        uses: actions/upload-artifact@v4
-        with:
-          name: bandit-report # This will be the name of the artifact.
-          path: bandit-report.json # The path to the file you want to upload.
