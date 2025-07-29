@@ -24,15 +24,11 @@ jobs:
         run: pip install bandit
 
       - name: Run Bandit and Generate Report
-        # Key changes are here:
-        # -f json: Formats the output as a JSON file.
-        # -o bandit-report.json: Writes the output to a file named 'bandit-report.json'.
-        # --exit-zero: Important! This tells Bandit to exit successfully (exit code 0) even if it finds issues.
-        # This ensures the next step (uploading the file) will run.
+
         run: bandit -r . -f json -o bandit-report.json --exit-zero
 
       - name: Upload Bandit Report as Artifact
-        # This step takes the report and saves it with the workflow run.
+
         uses: actions/upload-artifact@v4
         with:
           name: bandit-report # This will be the name of the artifact.
