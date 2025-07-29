@@ -74,5 +74,5 @@ jobs:
           # Call the Gemini API (v1beta) with the correctly formatted payload.
           curl -X POST \
                -H "Content-Type: application/json" \
-               "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+               "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
                -d "$PAYLOAD" | jq .
