@@ -35,22 +35,44 @@ jobs:
       # This step RUNS a command
       - name: Summarize Report with Gemini
         run: |
-          # 1. Read the raw report file into a shell variable.
           REPORT_AS_STRING=$(cat bandit-report.json)
 
-          # 2. Use jq to safely build the final JSON payload.
-          #    --arg passes the report string into the jq script.
-          #    This method correctly escapes all special characters, fixing the error.
-          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" '{
+          # This new prompt provides a strict template for the AI to follow.
+          PROMPT="You are a cybersecurity expert. Your task is to analyze this Bandit JSON report and provide a security summary. The output MUST follow this format exactly, listing each issue under its severity level:
+
+          ## 🚨 High Severity
+          **Error Name:** [The 'test_name' from the report]
+          **Error Message:** [The 'issue_text' from the report]
+
+          ---
+          
+          ## ⚠️ Medium Severity
+          **Error Name:** [The 'test_name' from the report]
+          **Error Message:** [The 'issue_text' from the report]
+          
+          ---
+
+          ## ✅ Low Severity
+          **Error Name:** [The 'test_name' from the report]
+          **Error Message:** [The 'issue_text' from the report]
+
+          If a severity level has no issues, state 'No issues found.' under that heading.
+          Do not add any other text, summary, or explanation outside of this format.
+          
+          Here is the Bandit JSON report:
+          "
+
+          # Use jq to safely build the final JSON payload with the new prompt.
+          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" --arg prompt "$PROMPT" '{
               "contents": [{
                   "parts": [{
-                      "text": ("You are a cybersecurity expert. Summarize this Bandit security report, identify the main risks, and list them by severity (High, Medium, Low). Report:\n\n" + $report)
+                      "text": ($prompt + "\n\n" + $report)
                   }]
               }]
           }')
           
-          # 3. Call the Gemini API with the correctly formatted payload.
+          # Call the Gemini API (v1beta) with the correctly formatted payload.
           curl -X POST \
                -H "Content-Type: application/json" \
-               "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+               "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
                -d "$PAYLOAD" | jq .
