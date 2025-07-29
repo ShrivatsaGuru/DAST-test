@@ -35,8 +35,21 @@ jobs:
       # This step RUNS a command
       - name: Summarize Report with Gemini
         run: |
-          REPORT_CONTENT=$(jq -c . bandit-report.json)
-          PAYLOAD=$(printf '{"contents":[{"parts":[{"text": "You are a cybersecurity expert. Summarize this Bandit security report, identify the main risks, and list them by severity (High, Medium, Low). Report:\n\n%s"}]}]}' "$REPORT_CONTENT")
+          # 1. Read the raw report file into a shell variable.
+          REPORT_AS_STRING=$(cat bandit-report.json)
+
+          # 2. Use jq to safely build the final JSON payload.
+          #    --arg passes the report string into the jq script.
+          #    This method correctly escapes all special characters, fixing the error.
+          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" '{
+              "contents": [{
+                  "parts": [{
+                      "text": ("You are a cybersecurity expert. Summarize this Bandit security report, identify the main risks, and list them by severity (High, Medium, Low). Report:\n\n" + $report)
+                  }]
+              }]
+          }')
+          
+          # 3. Call the Gemini API with the correctly formatted payload.
           curl -X POST \
                -H "Content-Type: application/json" \
                "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
