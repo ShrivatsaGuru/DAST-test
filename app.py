@@ -1,14 +1,47 @@
 # app.py
 import subprocess
-import yaml
+import os
 
-# Bandit will flag this as a security risk (B602)
-def run_command(data):
-    subprocess.run(data, shell=True)
+# --- High Severity Vulnerability ---
+# Bandit ID: B602 - Using subprocess with shell=True.
+# Risk: This can allow a user to execute arbitrary shell commands if the input
+# is not properly sanitized. It's a classic command injection risk.
+def run_shell_command(user_command):
+    print(f"Executing user command: {user_command}")
+    subprocess.run(user_command, shell=True)
 
-# Semgrep will flag this as unsafe YAML loading
-def load_config(config_file):
-    with open(config_file, 'r') as f:
-        return yaml.load(f, Loader=yaml.Loader)
 
-run_command("ls")
+# --- Medium Severity Vulnerability ---
+# Bandit ID: B105 - Hardcoding a password in source code.
+# Risk: Secrets stored in code can be easily exposed if the source code is
+# ever leaked or accessed by unauthorized individuals.
+def get_database_connection():
+    password = "MySuperSecretPassword123"  # Hardcoded password
+    print("Connecting to database...")
+    # Real connection logic would use the password here
+    return f"Connected with password: {password}"
+
+
+# --- Low Severity Vulnerability ---
+# Bandit ID: B101 - Use of the 'assert' keyword.
+# Risk: Assert statements are removed when Python is run in optimized mode
+# (with the -O flag), so any security checks using 'assert' can be bypassed.
+def verify_admin_status(is_admin):
+    # This is not a reliable security check
+    assert is_admin, "User must have admin privileges!"
+    print("Admin status verified.")
+
+
+# --- Example execution of the vulnerable functions ---
+
+print("--- Running High Severity Example ---")
+run_shell_command('echo "This command ran successfully."')
+
+print("\n--- Running Medium Severity Example ---")
+get_database_connection()
+
+print("\n--- Running Low Severity Example ---")
+try:
+    verify_admin_status(is_admin=False)
+except AssertionError as e:
+    print(f"Caught expected assertion error: {e}")
