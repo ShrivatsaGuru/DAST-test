@@ -27,12 +27,9 @@ def get_database_connection():
 # Risk: Assert statements are removed when Python is run in optimized mode
 # (with the -O flag), so any security checks using 'assert' can be bypassed.
 def verify_admin_status(is_admin):
-    # This is not a reliable security check
     assert is_admin, "User must have admin privileges!"
     print("Admin status verified.")
 
-
-# --- Example execution of the vulnerable functions ---
 
 print("--- Running High Severity Example ---")
 run_shell_command('echo "This command ran successfully."')
