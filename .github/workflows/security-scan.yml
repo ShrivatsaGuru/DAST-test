@@ -34,17 +34,50 @@ jobs:
 
       # Step 5: Summarize the report with Gemini and prepare the output
       - name: Summarize Report with Gemini
-        id: summarize # An ID to reference this step's outputs later
+        id: summarize
         run: |
           REPORT_AS_STRING=$(cat bandit-report.json)
-          PROMPT="You are a cybersecurity expert. Your task is to analyze this Bandit JSON report and provide a security summary. The output MUST follow this format, listing each issue under its severity level with a title for the error, where \n means write that from a new line and make sure to display the error name is bold. Here is the format= :\n🚨 High Severity\n Error Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n \n\n ⚠️ Medium Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n---\n\n ✅ Low Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\nIf a severity level has no issues, state 'No issues found.' under that heading.\nDo not add any other text, summary, or explanation outside of this format.\n\nHere is the Bandit JSON report:\n"
+
+          # This new prompt is specifically designed for clean formatting in Slack.
+          PROMPT="You are a cybersecurity expert. Your task is to analyze this Bandit JSON report and create a security summary formatted for Slack.
+
+          The output MUST follow this plain text format exactly. Use single asterisks for bolding as shown. Do not use markdown heading characters like '#'.
+
+          HIGH SEVERITY
+          Error Name: *[The 'test_name' from the report]*
+          Error Message: [The 'issue_text' from the report]
+
+          ---
+
+          MEDIUM SEVERITY
+          Error Name: *[The 'test_name' from the report]*
+          Error Message: [The 'issue_text' from the report]
+
+          ---
+
+          LOW SEVERITY
+          Error Name: *[The 'test_name' from the report]*
+          Error Message: [The 'issue_text' from the report]
+
+          If a severity level has no issues, state 'No issues found.' under that heading.
+          Do not add any other text or explanation outside of this format.
+
+          Here is the Bandit JSON report:
+          "
+
+          # Use jq to safely build the final JSON payload with the new prompt.
+          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" --arg prompt "$PROMPT" '{
+              "contents": [{
+                  "parts": [{
+                      "text": ($prompt + "\n\n" + $report)
+                  }]
+              }]
+          }')
           
-          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" --arg prompt "$PROMPT" '{ "contents": [{ "parts": [{ "text": ($prompt + "\n\n" + $report) }] }] }')
-          
-          # Call the Gemini API and save the response to a file 
-          curl -s -X POST -H "Content-Type: application/json" "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" -d "$PAYLOAD" > gemini_response.json
-          
-          # Extract the summary text and set it as a step output for the next step to use
+          # Call the Gemini API (v1beta) with the correctly formatted payload.
+          curl -s -X POST -H "Content-Type: application/json" "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${{ secrets.GEMINI_API_KEY }}" -d "$PAYLOAD" > gemini_response.json
+
+          # Extract the summary text and set it as a step output
           SUMMARY=$(jq -r '.candidates[0].content.parts[0].text // "Error: Could not get summary from Gemini."' gemini_response.json)
           echo "summary<<EOF" >> "$GITHUB_OUTPUT"
           echo "$SUMMARY" >> "$GITHUB_OUTPUT"
