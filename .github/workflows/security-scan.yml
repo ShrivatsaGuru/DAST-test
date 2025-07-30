@@ -75,7 +75,7 @@ jobs:
           }')
           
           # Call the Gemini API (v1beta) with the correctly formatted payload.
-          curl -s -X POST -H "Content-Type: application/json" "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${{ secrets.GEMINI_API_KEY }}" -d "$PAYLOAD" > gemini_response.json
+          curl -s -X POST -H "Content-Type: application/json" "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" -d "$PAYLOAD" > gemini_response.json
 
           # Extract the summary text and set it as a step output
           SUMMARY=$(jq -r '.candidates[0].content.parts[0].text // "Error: Could not get summary from Gemini."' gemini_response.json)
