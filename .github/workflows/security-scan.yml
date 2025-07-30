@@ -1,22 +1,22 @@
- .github/workflows/security-scan.yml
+# .github/workflows/security-scan.yml
 
 name: Security Scan
 
- This workflow runs on every push to any branch
-on: push
+# This workflow runs on every push to any branch
+on: [push]
 
 jobs:
-   .github/workflows/security-scan.yml
+  # .github/workflows/security-scan.yml
 
   bandit-scan:
     name: Bandit Scan
     runs-on: ubuntu-latest
     steps:
-       Step 1: Check out the code from your repository
+      # Step 1: Check out the code from your repository
       - name: Check out code
         uses: actions/checkout@v4
 
-       Step 2: Set up Python with optimized caching for speed
+      # Step 2: Set up Python with optimized caching for speed
       - name: Set up Python with dependency caching
         uses: actions/setup-python@v5
         with:
@@ -24,39 +24,39 @@ jobs:
           cache: 'pip'
           cache-dependency-path: requirements.txt
 
-       Step 3: Install dependencies using the cache
+      # Step 3: Install dependencies using the cache
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-       Step 4: Run Bandit to generate the JSON report
+      # Step 4: Run Bandit to generate the JSON report
       - name: Run Bandit and Generate Report
         run: bandit -r . -f json -o bandit-report.json --exit-zero
 
-       Step 5: Summarize the report with Gemini and prepare the output
+      # Step 5: Summarize the report with Gemini and prepare the output
       - name: Summarize Report with Gemini
-        id: summarize  An ID to reference this step's outputs later
+        id: summarize # An ID to reference this step's outputs later
         run: |
           REPORT_AS_STRING=$(cat bandit-report.json)
-          PROMPT="You are a cybersecurity expert. Your task is to analyze this Bandit JSON report and provide a security summary. The output MUST follow this format, listing each issue under its severity level with a title for the error, where \n means write that from a new line and make sure to display the error name is bold. Here is the format= :\n 🚨 High Severity\n Error Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n---\n\n ⚠️ Medium Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n---\n\n ✅ Low Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\nIf a severity level has no issues, state 'No issues found.' under that heading.\nDo not add any other text, summary, or explanation outside of this format.\n\nHere is the Bandit JSON report:\n"
+          PROMPT="You are a cybersecurity expert. Your task is to analyze this Bandit JSON report and provide a security summary. The output MUST follow this format, listing each issue under its severity level with a title for the error, where \n means write that from a new line and make sure to display the error name is bold. Here is the format= :\n🚨 High Severity\n Error Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n \n\n ⚠️ Medium Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\n---\n\n ✅ Low Severity\nError Name: The 'test_name' from the report\nError Message: The 'issue_text' from the report\n\nIf a severity level has no issues, state 'No issues found.' under that heading.\nDo not add any other text, summary, or explanation outside of this format.\n\nHere is the Bandit JSON report:\n"
           
-          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" --arg prompt "$PROMPT" '{ "contents": { "parts": { "text": ($prompt + "\n\n" + $report) } } }')
+          PAYLOAD=$(jq -n --arg report "$REPORT_AS_STRING" --arg prompt "$PROMPT" '{ "contents": [{ "parts": [{ "text": ($prompt + "\n\n" + $report) }] }] }')
           
-           Call the Gemini API and save the response to a file
+          # Call the Gemini API and save the response to a file 
           curl -s -X POST -H "Content-Type: application/json" "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" -d "$PAYLOAD" > gemini_response.json
           
-           Extract the summary text and set it as a step output for the next step to use
-          SUMMARY=$(jq -r '.candidates0.content.parts0.text // "Error: Could not get summary from Gemini."' gemini_response.json)
+          # Extract the summary text and set it as a step output for the next step to use
+          SUMMARY=$(jq -r '.candidates[0].content.parts[0].text // "Error: Could not get summary from Gemini."' gemini_response.json)
           echo "summary<<EOF" >> "$GITHUB_OUTPUT"
           echo "$SUMMARY" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-       Step 6: Send the generated summary to your Slack channel
+      # Step 6: Send the generated summary to your Slack channel
       - name: Send Report to Slack
-        if: success()  Only run this step if the previous steps succeeded
+        if: success() # Only run this step if the previous steps succeeded
         run: |
-           Use the output from the "summarize" step to build the Slack message
+          # Use the output from the "summarize" step to build the Slack message
           MESSAGE_TEXT="*Bandit Security Report Summary*:\n\n${{ steps.summarize.outputs.summary }}"
           SLACK_PAYLOAD=$(jq -n --arg text "$MESSAGE_TEXT" '{ "text": $text }')
           
-           Send the final message to your Slack webhook
+          # Send the final message to your Slack webhook
           curl -X POST -H "Content-Type: application/json" --data "$SLACK_PAYLOAD" ${{ secrets.SLACK_WEBHOOK_URL }}
