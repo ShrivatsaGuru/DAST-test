@@ -1,0 +1,26 @@
+name: OWASP ZAP Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  zap_scan:
+    name: ZAP Baseline Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ZAP Baseline Scan
+      uses: zaproxy/action-full-scan@v0.8.0
+      with:
+        target: 'https://dast-test-production.up.railway.app/'  
+        fail_action: false
+        cmd_options: '-a'  # Show all alerts
+
+    - name: Upload ZAP Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: zap-report
+        path: owasp-zap-report.html
