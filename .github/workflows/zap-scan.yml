@@ -20,7 +20,7 @@ jobs:
         cmd_options: '-a'  # Show all alerts
 
     - name: Upload ZAP Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: zap-report
         path: owasp-zap-report.html
