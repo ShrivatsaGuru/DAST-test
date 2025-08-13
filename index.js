@@ -5,13 +5,12 @@ const port = process.env.PORT || 3000;
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Vulnerable route: reflected XSS
+
 app.get('/search', (req, res) => {
   const q = req.query.q || '';
   res.send(`<h1>Results for: ${q}</h1>`);
 });
 
-// Vulnerable route: open redirect
 app.get('/redirect', (req, res) => {
   const url = req.query.url;
   if (url) {
