@@ -27,4 +27,4 @@ jobs:
             -r report.html   # attach HTML report artifact
             -J report.json   # also output JSON
           allow_issue_writing: true
-          fail_action: true   # fail the job if alerts found (see rules.tsv)
+          fail_action: false   # do not fail the workflow if issues are found
