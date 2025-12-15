@@ -67,8 +67,4 @@ jobs:
           # The script logic handles the AI prompt and Slack formatting internally
           USE_AI_CLASSIFICATION: true
         run: |
-          # The Python script is assumed to handle the following:
-          # 1. Read report.json
-          # 2. Call Gemini API with GEMINI_API_KEY to summarize, categorize, diagnose, and suggest fixes.
-          # 3. Send the full AI-generated report content to the SLACK_WEBHOOK_URL.
           python slack_reporter_full.py report.json javascript
