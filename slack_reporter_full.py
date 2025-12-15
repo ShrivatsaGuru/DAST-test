@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+Full DAST Slack Reporter with AI Classification & Remediation
+Combines AI classification with actionable remediation guidance
+"""
+
 import os
 import json
 from typing import Dict, List, Optional

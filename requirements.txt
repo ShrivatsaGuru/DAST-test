@@ -1,1 +1,17 @@
 bandit
+requests
+slack-sdk
+python-dotenv
+
+# AI/ML Classification (Primary: Gemini for quality)
+google-generativeai>=0.3.0
+
+# AI/ML Classification (Optional alternatives - keep placeholder for easy switching)
+# groq  # Uncomment for ultra-fast inference
+# openai  # Uncomment for OpenAI GPT-4
+google-generativeai
+groq
+transformers
+torch
+google-generativeai
+groq
