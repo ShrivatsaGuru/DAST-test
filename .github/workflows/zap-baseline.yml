@@ -48,23 +48,14 @@ jobs:
           allow_issue_writing: false
           fail_action: false
 
-      # 3. Upload Reports (Optional but Recommended)
-      - name: ⬆️ Upload ZAP Reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-reports
-          path: |
-            report.html
-            report.json
 
       # 4. AI Processing and Slack Reporting (Steps 3 & 4)
       - name: 🤖 Send AI-Powered Slack Report with Remediation
+        if: always()
         env:
-          # Pass the AI key as a secret
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || '#security-alerts' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Pass the Slack Webhook as a secret
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          # The script logic handles the AI prompt and Slack formatting internally
           USE_AI_CLASSIFICATION: true
         run: |
-          python slack_reporter_full.py report.json javascript
+          cat report.json | python slack_reporter_full.py javascript
