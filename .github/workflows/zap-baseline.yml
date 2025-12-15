@@ -15,14 +15,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-          
-      - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
+      # 1. Set up Python (required before caching)
+        - name: Set up Python
+          uses: actions/setup-python@v5
+          with:
+            python-version: '3.x' # Use your specific Python version, e.g., '3.9'
+            
+        # 2. Cache Python Dependencies
+        - name:  Cache Python Dependencies
+          id: cache-pip
+          uses: actions/cache@v4
+          with:
+            # Key changes if requirements.txt file contents change
+            key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+            # Path points to where pip installs the packages
+            path: ${{ env.pythonLocation }}
+        
+        # 3. Install Dependencies ONLY if cache misses
+        - name: ⚙️ Install Python Dependencies (If Cache Missed)
+          # This conditional prevents the install step if the cache was found
+          if: steps.cache-pip.outputs.cache-hit != 'true'
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
           
       - name: ZAP Baseline Scan
         uses: zaproxy/action-full-scan@v0.12.0
