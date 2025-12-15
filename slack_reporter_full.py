@@ -39,17 +39,21 @@ AI_REPORT_SCHEMA = {
 
 # --- Core Functions ---
 
-def read_zap_report(file_path):
-    """Reads the ZAP JSON report from the specified path."""
+def read_zap_report_from_stdin():
+    """Reads the ZAP JSON report from Standard Input (sys.stdin)."""
+    import sys # Make sure this import is at the top of your file
+    
     try:
-        with open(file_path, 'r') as f:
-            report_data = json.load(f)
+        # This line reads everything that was pushed through the pipe
+        report_string = sys.stdin.read()
+        if not report_string:
+            raise ValueError("No data received from stdin. The report file might be empty or missing.")
+            
+        # This turns the text into Python data (JSON)
+        report_data = json.loads(report_string)
         return report_data
-    except FileNotFoundError:
-        print(f"❌ Report file not found: {file_path}")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"❌ Failed to decode JSON from file: {file_path}")
+    except Exception as e:
+        print(f"❌ Error reading report from pipe: {e}")
         sys.exit(1)
 
 def analyze_with_gemini(report_data):
@@ -203,31 +207,24 @@ def send_to_slack(payload):
 # --- Main Execution ---
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python slack_reporter_full.py <path_to_report.json> [language_tag (optional)]")
-        sys.exit(1)
-
-    report_file_path = sys.argv[1]
+    # We no longer check for command-line arguments (sys.argv[1])
     
-    # 1. Read the ZAP report
-    zap_report = read_zap_report(report_file_path)
+    # 1. Read the ZAP report directly from the pipe (stdin)
+    zap_report = read_zap_report_from_stdin()
     
     if USE_AI_CLASSIFICATION:
-        # 2. Analyze the report using Gemini
+        # 2. Analyze the report using Gemini (Function is unchanged)
         ai_report_data = analyze_with_gemini(zap_report)
         
         if ai_report_data:
-            # 3. Format the report for Slack
+            # 3. Format the report for Slack (Function is unchanged)
             slack_payload = format_slack_message(ai_report_data)
             
-            # 4. Send the report to Slack
+            # 4. Send the report to Slack (Function is unchanged)
             send_to_slack(slack_payload)
         else:
             print("🛑 AI analysis failed. Cannot proceed with Slack report.")
             sys.exit(1)
     else:
-        # Fallback for when AI is disabled (not the user's requested path, but good practice)
         print("AI classification is disabled. Skipping analysis.")
-        # You would add code here to send a basic, raw report if AI analysis is skipped.
-        # For this exercise, we assume AI is required.
-        sys.exit(0) # Exit successfully if AI is intentionally skipped
+        sys.exit(0)
