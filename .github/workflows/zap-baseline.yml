@@ -14,6 +14,16 @@ jobs:
       issues: write          # to file/update a GitHub Issue with findings
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          
       - name: ZAP Baseline Scan
         uses: zaproxy/action-full-scan@v0.12.0
         with:
@@ -28,3 +38,22 @@ jobs:
             -J report.json   # also output JSON
           allow_issue_writing: true
           fail_action: false   # do not fail the workflow if issues are found
+          
+      - name: Upload ZAP Reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: zap-reports
+          path: |
+            report.html
+            report.json
+            
+      - name: Send AI-Powered Slack Report with Remediation
+        if: always()
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || '#security-alerts' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          USE_AI_CLASSIFICATION: true
+        run: |
+          python slack_reporter_full.py report.json javascript
