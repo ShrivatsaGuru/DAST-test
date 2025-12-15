@@ -1,62 +1,55 @@
-name: ZAP Baseline (DAST)
+name: ZAP Full DAST Scan and AI Reporting
+
 on:
   push:
     branches: [ main ]
   pull_request:
   schedule:
-    - cron: "0 2 * * 1" # Mondays 02:00 UTC
+    - cron: "0 2 * * 1" # Run every Monday at 02:00 UTC
 
 jobs:
-  zap-baseline:
+  ai-dast-report:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write # to file/update a GitHub Issue with findings
+      issues: write
     steps:
-      - uses: actions/checkout@v4
+      - name: ⬇️ Checkout Code
+        uses: actions/checkout@v4
 
-      # 1. Set up Python
-      - name:  Set up Python
+      # 1. Caching and Python Setup (Step 1)
+      - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x' # Use your specific Python version, e.g., '3.9'
+          python-version: '3.x'
 
-      # 2. Cache Python Dependencies
-      - name:  Cache Python Dependencies
+      - name: 📦 Cache Python Dependencies
         id: cache-pip
         uses: actions/cache@v4
         with:
-          # Key changes if requirements.txt file contents change
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-          # Path points to where pip installs the packages
           path: ${{ env.pythonLocation }}
 
-      # 3. Install Dependencies ONLY if cache misses
       - name: ⚙️ Install Python Dependencies (If Cache Missed)
-        # This conditional prevents the install step if the cache was found
         if: steps.cache-pip.outputs.cache-hit != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # ZAP ACTION FIX: action-full-scan is on v0.13.0, not v0.12.0 (as of late 2025)
-      - name: ZAP Full Scan
-        uses: zaproxy/action-full-scan@v0.13.0
+      # 2. Perform OWASP ZAP Full Scan (Step 2)
+      - name: 🛡️ Run ZAP Full Scan
+        id: zap_scan
+        uses: zaproxy/action-full-scan@v0.13.0 # Using latest stable version
         with:
-          target: https://dast-test-production.up.railway.app/
+          # Use the TARGET_URL variable from your GitHub Environment
+          target: ${{ vars.TARGET_URL }}
           rules_file_name: .zap/rules.tsv
-          docker_name: ghcr.io/zaproxy/zaproxy:stable
-          cmd_options: >-
-            -m 2 # spider minutes
-            -a   # include alpha passive rules
-            -j   # use Ajax spider (good for SPAs)
-            -r report.html # attach HTML report artifact
-            -J report.json # also output JSON
-          allow_issue_writing: true
-          fail_action: false # do not fail the workflow if issues are found
+          cmd_options: '-m 10 -r report.html -J report.json' # Scan for 10 mins, output HTML/JSON
+          allow_issue_writing: false
+          fail_action: false
 
-      # The report files are now guaranteed to be report.html and report.json
-      - name: Upload ZAP Reports
+      # 3. Upload Reports (Optional but Recommended)
+      - name: ⬆️ Upload ZAP Reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-reports
@@ -64,13 +57,18 @@ jobs:
             report.html
             report.json
 
-      - name: Send AI-Powered Slack Report with Remediation
-        if: always()
+      # 4. AI Processing and Slack Reporting (Steps 3 & 4)
+      - name: 🤖 Send AI-Powered Slack Report with Remediation
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-          # Ensure SLACK_CHANNEL uses 'vars' if it is a custom repository variable
-          SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL || '#security-alerts' }}
+          # Pass the AI key as a secret
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Pass the Slack Webhook as a secret
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # The script logic handles the AI prompt and Slack formatting internally
           USE_AI_CLASSIFICATION: true
         run: |
+          # The Python script is assumed to handle the following:
+          # 1. Read report.json
+          # 2. Call Gemini API with GEMINI_API_KEY to summarize, categorize, diagnose, and suggest fixes.
+          # 3. Send the full AI-generated report content to the SLACK_WEBHOOK_URL.
           python slack_reporter_full.py report.json javascript
