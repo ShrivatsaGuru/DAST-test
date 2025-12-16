@@ -47,6 +47,14 @@ jobs:
           cmd_options: '-m 10 -r report.html -J report.json' # Scan for 10 mins, output HTML/JSON
           allow_issue_writing: false
           fail_action: false
+          
+      - name: ⚙️ Fix Report File Permissions
+        run: |
+          # The 'chmod a+rw' command gives ALL users (a) read and write (+rw) 
+          # permission to the report file created by the Docker container.
+          chmod a+rw report.json
+          # Optionally, check to see the permissions are correct (for debugging)
+          ls -l report.json
 
 
       # 4. AI Processing and Slack Reporting (Steps 3 & 4)
