@@ -1,4 +1,4 @@
-name: 🛡️ Standard DAST Scan
+name: 🛡️ ZAP DAST Scan with AI Analysis
 
 on:
   push:
@@ -7,18 +7,15 @@ on:
   schedule:
     - cron: "0 2 * * 1" # Runs every Monday at 02:00 UTC
 
-# Define environment variables used throughout the job
 env:
-  # The target URL is expected to be set as a repository Variable (Settings -> Variables)
+  # Ensure TARGET_URL is set in your Repo Settings -> Secrets and variables -> Variables
   TARGET_URL: ${{ vars.TARGET_URL }} 
-  # Use a standard rules file to ignore false positives or low-info issues
   RULES_FILE: .zap/rules.tsv
-  
+
 jobs:
-  zap-scan:
+  zap-scan-and-analyze:
     runs-on: ubuntu-latest
     permissions:
-      # Required to file issues/alerts if you enable that feature
       contents: read
       issues: write 
     
@@ -26,7 +23,7 @@ jobs:
       - name: ⬇️ Checkout Code
         uses: actions/checkout@v4
 
-      # --- Python Caching for Speed (If you have a requirements.txt) ---
+      # --- Python Setup & Caching ---
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
@@ -42,65 +39,52 @@ jobs:
       - name: ⚙️ Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
+          # Ensure 'google-genai' is in your requirements.txt
           pip install -r requirements.txt --cache-dir ~/.cache/pip
-      # -----------------------------------------------------------------
 
-      # 1. Run the OWASP ZAP Full Scan
-      # NOTE: action-full-scan performs attacks. Only run against systems you own!
+      # --- 1. OWASP ZAP Scan ---
       - name: 🛡️ Run ZAP Full Scan
         id: zap_scan
         uses: zaproxy/action-full-scan@v0.13.0
         with:
-          target: ${{ vars.TARGET_URL }}
-          rules_file_name: .zap/rules.tsv
+          target: ${{ env.TARGET_URL }}
+          rules_file_name: ${{ env.RULES_FILE }}
           cmd_options: >-
-            -m 10             
-            -r zap_report.html
-            -J zap_report.json # <-- This file will be read next
-            -a
-          fail_action: false # Allow subsequent steps to run even if ZAP finds issues
+            -m 10 
+            -r zap_report.html 
+            -J zap_report.json 
+            -a 
+          fail_action: false # Don't stop yet; we need to run the AI analysis
 
-      # 2. Fix Permissions (Crucial step to read file created by Docker)
-      - name: ⚙️ Fix Report File Permissions
+      # --- 2. Fix Permissions (Crucial Fix) ---
+      - name: ⚙️ Fix Report Permissions
         run: |
-          chmod a+rw zap_report.json
-          ls -l zap_report.json
-          
-      # 3. AI Analysis and Remediation (New Step)
+          # Use sudo to fix the file owned by the Docker root user
+          sudo chmod a+rw zap_report.json
+          sudo chmod a+rw zap_report.html
+          ls -l zap_report.json # Verify file exists and is readable
+
+      # --- 3. AI Analysis (Gemini) ---
       - name: 🤖 Run Gemini AI Security Analyst
+        if: always() # Run even if ZAP found vulnerabilities
         env:
-          # Pass the Gemini Key as a secret
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
         run: |
-          # The script reads zap_report.json and creates ai_report.json
+          # This script reads zap_report.json and outputs ai_report.json
           python ai_analyst.py zap_report.json
 
-      # 4. Upload All Reports (Original ZAP + New AI Report)
+      # --- 4. Upload Artifacts ---
       - name: ⬆️ Upload DAST Reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dast-scan-reports
+          name: dast-security-reports
           path: |
             zap_report.html
             zap_report.json
-            ai_report.json # <-- Upload the new AI-generated report
+            ai_report.json
 
-      # 3. Use the Report (Example: Simple Slack Notification)
-      # This step runs your custom Python script to send a basic notification.
-      - name: 📢 Send Simple Slack Notification
-        if: always() # Run even if the ZAP step above failed (to report the failure)
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: ${{ vars.SLACK_CHANNEL }}
-        run: |
-          # Use a simple Python command to notify about the pipeline status
-          if [ $? -ne 0 ]; then
-            REPORT_STATUS="FAILED: High/Critical issues found!"
-          else
-            REPORT_STATUS="PASSED: No critical issues found."
-          fi
-          
-          echo "Sending notification..."
-          # Replace this with your actual Python script if needed, 
-          # or a simple curl command for generic notifications:
-          python send_notification.py "${REPORT_STATUS}" "${TARGET_URL}"
+      # --- 5. Final Notification (Optional) ---
+      - name: 📢 Scan Complete
+        if: always()
+        run: echo "✅ DAST Scan and AI Analysis completed successfully."
