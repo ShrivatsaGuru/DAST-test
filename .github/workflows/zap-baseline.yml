@@ -58,7 +58,7 @@ jobs:
 
 
       # 4. AI Processing and Slack Reporting (Steps 3 & 4)
-      - name: 🤖 Send AI-Powered Slack Report with Remediation
+      - name: Send AI-Powered Slack Report with Remediation
         if: always()
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
@@ -66,4 +66,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           USE_AI_CLASSIFICATION: true
         run: |
-          cat report.json | python slack_reporter_full.py javascript
+          python slack_reporter_full.py report.json javascript
