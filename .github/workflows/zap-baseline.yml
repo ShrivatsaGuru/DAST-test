@@ -44,7 +44,7 @@ jobs:
           # Use the TARGET_URL variable from your GitHub Environment
           target: ${{ vars.TARGET_URL }}
           rules_file_name: .zap/rules.tsv
-          cmd_options: '-m 10 -r report.html -J report.json' # Scan for 10 mins, output HTML/JSON
+          cmd_options: -m 10 -r report.html -J report.json # Scan for 10 mins, output HTML/JSON
           allow_issue_writing: false
           fail_action: false
           
@@ -66,4 +66,4 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           USE_AI_CLASSIFICATION: true
         run: |
-          python slack_reporter_full.py report.json javascript
+          cat report.json | python slack_reporter_full.py javascript
