@@ -2,17 +2,9 @@ bandit
 requests
 slack-sdk
 python-dotenv
-<<<<<<< HEAD
 flask
-=======
 google-genai
->>>>>>> 6aacd85f8b5edcbff6d9599c880f438f82481a1e
-# AI/ML Classification (Primary: Gemini for quality)
 google-generativeai>=0.3.0
-
-# AI/ML Classification (Optional alternatives - keep placeholder for easy switching)
-# groq  # Uncomment for ultra-fast inference
-# openai  # Uncomment for OpenAI GPT-4
 google-generativeai
 groq
 transformers
