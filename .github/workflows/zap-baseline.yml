@@ -96,27 +96,14 @@ jobs:
           import urllib.request
       
           try:
-              with open("ai_report.json", "r") as f:
-                  data = json.load(f)
-      
-              report_text = json.dumps(data, indent=2)
-      
+              with open("slack_report.txt") as f:
+                text = f.read()
+            
               payload = {
-                  "channel": "#reports",
-                  "username": "Gemini Security Analyst",
-                  "text": (
-                      "*🛡️ ZAP DAST Scan & Gemini Analysis*\n"
-                      "Here are the AI-generated insights:\n\n"
-                      f"```json\n{report_text}\n```"
-                  )
-              }
-      
-              req = urllib.request.Request(
-                  os.environ["SLACK_WEBHOOK_URL"],
-                  data=json.dumps(payload).encode("utf-8"),
-                  headers={"Content-Type": "application/json"}
-              )
-      
+                "channel": "#reports",
+                "username": "Gemini Security Analyst",
+                "text": text[:39000]
+            }
               urllib.request.urlopen(req)
               print("✅ Slack notification sent to #reports.")
       
