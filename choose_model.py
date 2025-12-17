@@ -20,7 +20,7 @@ class GeminiResolver:
     def __init__(self):
         import google.generativeai as genai
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
     def get_resolution(self, issue):
         prompt = LLM_PROMPT_TEMPLATE.format(
