@@ -85,40 +85,41 @@ jobs:
             ai_report.json
 
             
-      - name: 📢 Scan Complete
-        if: always()
-        run: echo "✅ DAST Scan and AI Analysis completed successfully."
       - name: 🔔 Send Slack Notification
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          python -c "
-          import os, json, urllib.request
-
+          python - <<'EOF'
+          import os
+          import json
+          import urllib.request
+      
           try:
-              # Load the AI report
-              with open('ai_report.json', 'r') as f:
+              with open("ai_report.json", "r") as f:
                   data = json.load(f)
-
-              # Format message (Convert JSON to string for the code block)
-              # If your report is very large, you might want to truncate it
+      
               report_text = json.dumps(data, indent=2)
-
+      
               payload = {
-                  'channel': #reports,
-                  'username': Gemini Security Analyst,
-                  'text': f'*🛡️ ZAP DAST Scan & Gemini Analysis*\nHere are the AI-generated insights:\n\n\`\`\`json\n{report_text}\n\`\`\`'
+                  "channel": "#reports",
+                  "username": "Gemini Security Analyst",
+                  "text": (
+                      "*🛡️ ZAP DAST Scan & Gemini Analysis*\n"
+                      "Here are the AI-generated insights:\n\n"
+                      f"```json\n{report_text}\n```"
+                  )
               }
-
-              # Send POST request
+      
               req = urllib.request.Request(
-                  os.environ['SLACK_WEBHOOK_URL'], 
-                  data=json.dumps(payload).encode('utf-8'), 
-                  headers={'Content-Type': 'application/json'}
+                  os.environ["SLACK_WEBHOOK_URL"],
+                  data=json.dumps(payload).encode("utf-8"),
+                  headers={"Content-Type": "application/json"}
               )
+      
               urllib.request.urlopen(req)
-              print('✅ Slack notification sent successfully.')
+              print("✅ Slack notification sent to #reports.")
+      
           except Exception as e:
-              print(f'⚠️ Failed to send Slack notification: {e}')
-          "
+              print(f"⚠️ Failed to send Slack notification: {e}")
+          EOF
