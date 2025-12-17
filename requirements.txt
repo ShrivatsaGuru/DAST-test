@@ -2,7 +2,11 @@ bandit
 requests
 slack-sdk
 python-dotenv
+<<<<<<< HEAD
 flask
+=======
+google-genai
+>>>>>>> 6aacd85f8b5edcbff6d9599c880f438f82481a1e
 # AI/ML Classification (Primary: Gemini for quality)
 google-generativeai>=0.3.0
 
