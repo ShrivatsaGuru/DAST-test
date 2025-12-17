@@ -1,113 +1,122 @@
-import os
-import sys
 import json
+import os
+from collections import defaultdict
 from google import genai
-from google.genai import types
 
-# --- Configuration ---
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# ------------------ CONFIG ------------------
+GEMINI_MODEL = "gemini-2.5-flash"
 
-# Define the structured output format for Gemini
-AI_REPORT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "overall_threat_level": {"type": "string", "description": "Overall security rating for the site: None, Low, Medium, High, or Urgent/Red Alert."},
-        "summary": {"type": "string", "description": "A brief, non-technical summary of the findings."},
-        "critical_vulnerabilities": {
-            "type": "array",
-            "description": "Analysis of the top 3 most critical vulnerabilities.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "category": {"type": "string", "description": "Category of the vulnerability (e.g., Injection, XSS, Misconfiguration, etc.)"},
-                    "diagnosis": {"type": "string", "description": "Detailed explanation of the vulnerability and its impact."},
-                    "remediation_steps": {"type": "string", "description": "Specific, actionable steps to fix the vulnerability, formatted in markdown."}
-                },
-                "required": ["name", "category", "diagnosis", "remediation_steps"]
-            }
-        },
-        "next_steps": {"type": "string", "description": "Clear next steps for the security team."}
-    },
-    "required": ["overall_threat_level", "summary", "critical_vulnerabilities", "next_steps"]
+SEVERITY_MAP = {
+    0: ("None", "⚪"),
+    1: ("Low", "🟢"),
+    2: ("Medium", "🟡"),
+    3: ("High", "🟠"),
+    4: ("Critical", "🔴"),
 }
 
-def analyze_report(report_data):
-    """Sends the ZAP report to Gemini for structured analysis."""
-    if not GEMINI_API_KEY:
-        print("❌ Error: GEMINI_API_KEY environment variable not set.")
-        return None
+CATEGORY_ORDER = ["Critical", "High", "Medium", "Low", "None"]
 
-    print("\n🤖 Sending ZAP report to Gemini for structured analysis...")
-    
-    try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-    except Exception as e:
-        print(f"❌ Error initializing Gemini client: {e}")
-        return None
-        
-    report_string = json.dumps(report_data, indent=2)
+# ------------------ GEMINI CLIENT ------------------
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    system_instruction = (
-        "You are an expert security analyst reviewing a DAST report. "
-        "Summarize the findings, categorize the overall threat level (None, Low, Medium, High, Urgent/Red Alert), "
-        "and provide detailed, actionable remediation steps for the most critical issues. "
-        "Your output MUST be a JSON object strictly following the provided schema."
+# ------------------ LOAD ZAP REPORT ------------------
+with open("zap_report.json", "r") as f:
+    zap = json.load(f)
+
+sites = zap.get("site", [])
+alerts = sites[0].get("alerts", []) if sites else []
+
+grouped = defaultdict(list)
+
+# ------------------ ANALYZE EACH VULNERABILITY ------------------
+for alert in alerts:
+    risk_code = int(alert.get("riskcode", 0))
+    severity, emoji = SEVERITY_MAP[risk_code]
+
+    prompt = f"""
+You are a senior application security engineer.
+
+You are analyzing an OWASP ZAP DAST finding.
+
+IMPORTANT RULES:
+- This is a DAST scan. Do NOT invent exact file names or line numbers.
+- If exact code location is unknown, say: "Not available from DAST scan"
+- Be clear, concise, and practical.
+- Provide secure coding examples.
+- Output PLAIN TEXT (not JSON).
+
+Vulnerability Name:
+{alert.get("alert")}
+
+Affected URL:
+{alert.get("url")}
+
+Parameter:
+{alert.get("param")}
+
+Evidence:
+{alert.get("evidence")}
+
+Description:
+{alert.get("desc")}
+
+ZAP Suggested Solution:
+{alert.get("solution")}
+
+Create a structured explanation with the following sections:
+
+1. What is the problem?
+2. Where is it likely located in the codebase?
+3. Why is this dangerous?
+4. How to fix it (include a short secure code example)
+"""
+
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt
     )
 
-    prompt = f"Analyze the following OWASP ZAP DAST report (JSON):\n\n{report_string}"
+    grouped[severity].append({
+        "emoji": emoji,
+        "title": alert.get("alert"),
+        "endpoint": alert.get("url"),
+        "analysis": response.text.strip()
+    })
 
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                response_schema=AI_REPORT_SCHEMA,
-            )
-        )
-        
-        # Print the raw JSON response text for logging
-        print("\n--- AI-GENERATED REPORT JSON ---")
-        print(response.text)
-        print("--------------------------------\n")
-        
-        return json.loads(response.text)
-        
-    except Exception as e:
-        print(f"❌ Gemini API call failed. Error: {e}")
-        return None
+# ------------------ BUILD SLACK REPORT ------------------
+lines = []
+lines.append("🛡️ *ZAP DAST Security Report – Gemini AI Analysis*")
+lines.append("")
+lines.append("This report summarizes the vulnerabilities detected by OWASP ZAP and analyzed by Gemini AI.")
+lines.append("")
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python ai_analyst.py <path_to_report.json>")
-        sys.exit(1)
+# Summary
+lines.append("*📊 Summary*")
+for sev in CATEGORY_ORDER:
+    lines.append(f"{SEVERITY_MAP[[k for k,v in SEVERITY_MAP.items() if v[0]==sev][0]][1]} {sev}: {len(grouped.get(sev, []))}")
+lines.append("\n---\n")
 
-    report_path = sys.argv[1]
+# Detailed sections
+for severity in CATEGORY_ORDER:
+    findings = grouped.get(severity, [])
+    if not findings:
+        continue
 
-    try:
-        with open(report_path, 'r', encoding='utf-8') as f:
-            zap_report = json.load(f)
-    except FileNotFoundError:
-        print(f"❌ Error: Report file not found at {report_path}")
-        sys.exit(1)
-    except json.JSONDecodeError:
-        print(f"❌ Error: Failed to parse JSON from {report_path}")
-        sys.exit(1)
+    emoji = findings[0]["emoji"]
+    lines.append(f"{emoji} *{severity} Severity Issues*")
+    lines.append("")
 
-    ai_report = analyze_report(zap_report)
+    for idx, v in enumerate(findings, start=1):
+        lines.append(f"*{idx}. {v['title']}*")
+        lines.append(f"• *Affected Endpoint:* `{v['endpoint']}`")
+        lines.append(v["analysis"])
+        lines.append("\n---\n")
 
-    if ai_report:
-        print(f"✅ AI Analysis Complete. Overall Threat: {ai_report.get('overall_threat_level')}")
-        # Optionally save the structured AI report for other steps (e.g., Slack)
-        with open("ai_report.json", "w") as f:
-            json.dump(ai_report, f, indent=2)
-        print("✅ Structured AI report saved to ai_report.json.")
-        
-    else:
-        print("🛑 AI analysis failed. Exiting.")
-        sys.exit(1)
+# ------------------ WRITE OUTPUT ------------------
+final_report = "\n".join(lines)
 
-if __name__ == "__main__":
-    main()
+with open("slack_report.txt", "w") as f:
+    f.write(final_report)
+
+print("✅ Gemini analysis complete")
+print("📄 Slack-ready report written to slack_report.txt")
