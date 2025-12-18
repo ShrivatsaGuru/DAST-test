@@ -8,8 +8,7 @@ on:
     - cron: "0 2 * * 1" # Runs every Monday at 02:00 UTC
 
 env:
-  # Ensure TARGET_URL is set in your Repo Settings -> Secrets and variables -> Variables
-  TARGET_URL: ${{ vars.TARGET_URL }} 
+  TARGET_URL: ${{ vars.TARGET_URL }}
   RULES_FILE: .zap/rules.tsv
 
 jobs:
@@ -17,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write 
-    
+      issues: write
+
     steps:
       - name: ⬇️ Checkout Code
         uses: actions/checkout@v4
@@ -30,47 +29,41 @@ jobs:
           python-version: '3.x'
 
       - name: 📦 Cache Pip Dependencies
-        id: cache-pip
         uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-pip-cache-${{ hashFiles('requirements.txt') }}
           path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: ⚙️ Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          # Ensure 'google-genai' is in your requirements.txt
-          pip install -r requirements.txt --cache-dir ~/.cache/pip
+          pip install -r requirements.txt
 
       # --- 1. OWASP ZAP Scan ---
       - name: 🛡️ Run ZAP Full Scan
-        id: zap_scan
         uses: zaproxy/action-full-scan@v0.13.0
         with:
           target: ${{ env.TARGET_URL }}
           rules_file_name: ${{ env.RULES_FILE }}
-          cmd_options: >-
-            -m 10 
-            -r zap_report.html 
-            -J zap_report.json 
-            -a 
-          fail_action: false # Don't stop yet; we need to run the AI analysis
+          cmd_options: >
+            -m 10
+            -r zap_report.html
+            -J zap_report.json
+            -a
+          fail_action: false
 
-      # --- 2. Fix Permissions (Crucial Fix) ---
+      # --- 2. Fix Permissions ---
       - name: ⚙️ Fix Report Permissions
         run: |
-          # Use sudo to fix the file owned by the Docker root user
-          sudo chmod a+rw zap_report.json
-          sudo chmod a+rw zap_report.html
-          ls -l zap_report.json # Verify file exists and is readable
+          sudo chmod 666 zap_report.json zap_report.html
+          ls -lh zap_report.*
 
       # --- 3. AI Analysis (Gemini) ---
       - name: 🤖 Run Gemini AI Security Analyst
-        if: always() # Run even if ZAP found vulnerabilities
+        if: always()
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          # This script reads zap_report.json and outputs ai_report.json
           python ai_analyst.py zap_report.json
 
       # --- 4. Upload Artifacts ---
@@ -84,7 +77,7 @@ jobs:
             zap_report.json
             ai_report.json
 
-            
+      # --- 5. Slack Notification (ZAP Artifacts Only) ---
       - name: 🔔 Send ZAP Report to Slack
         if: always()
         env:
@@ -100,22 +93,17 @@ jobs:
           run_id = os.environ["GITHUB_RUN_ID"]
           repo = os.environ["GITHUB_REPOSITORY"]
 
-          artifact_url = (
-              f"https://github.com/{repo}/actions/runs/{run_id}"
+          artifact_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+
+          message = (
+              "🛡️ *OWASP ZAP DAST Scan Completed*\n\n"
+              "📦 *ZAP Reports Generated*\n"
+              "• HTML Report: zap_report.html\n"
+              "• JSON Report: zap_report.json\n\n"
+              "⬇️ *Download Reports*\n"
+              f"{artifact_url}\n\n"
+              "📌 Navigate to **Artifacts → dast-security-reports**"
           )
-
-          message = f"""
-🛡️ *OWASP ZAP DAST Scan Completed*
-
-📦 *ZAP Reports Generated*
-• HTML Report: zap_report.html
-• JSON Report: zap_report.json
-
-⬇️ *Download Reports*
-{artifact_url}
-
-📌 Navigate to **Artifacts → dast-security-reports**
-"""
 
           payload = {
               "channel": "#reports",
@@ -131,6 +119,5 @@ jobs:
           )
 
           urllib.request.urlopen(req)
-          print("✅ ZAP report notification sent to #reports.")
+          print("✅ Slack notification sent to #reports")
           EOF
-
