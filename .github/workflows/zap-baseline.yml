@@ -85,28 +85,52 @@ jobs:
             ai_report.json
 
             
-      - name: 🔔 Send Slack Notification
+      - name: 🔔 Send ZAP Report to Slack
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python - <<'EOF'
-          import os
           import json
           import urllib.request
-      
-          try:
-              with open("slack_report.txt") as f:
-                text = f.read()
-            
-              payload = {
-                "channel": "#reports",
-                "username": "Gemini Security Analyst",
-                "text": text[:39000]
-            }
-              urllib.request.urlopen(req)
-              print("✅ Slack notification sent to #reports.")
-      
-          except Exception as e:
-              print(f"⚠️ Failed to send Slack notification: {e}")
+          import os
+
+          run_id = os.environ["GITHUB_RUN_ID"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+
+          artifact_url = (
+              f"https://github.com/{repo}/actions/runs/{run_id}"
+          )
+
+          message = f"""
+🛡️ *OWASP ZAP DAST Scan Completed*
+
+📦 *ZAP Reports Generated*
+• HTML Report: zap_report.html
+• JSON Report: zap_report.json
+
+⬇️ *Download Reports*
+{artifact_url}
+
+📌 Navigate to **Artifacts → dast-security-reports**
+"""
+
+          payload = {
+              "channel": "#reports",
+              "username": "ZAP Security Scanner",
+              "icon_emoji": ":shield:",
+              "text": message
+          }
+
+          req = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"}
+          )
+
+          urllib.request.urlopen(req)
+          print("✅ ZAP report notification sent to #reports.")
           EOF
+
